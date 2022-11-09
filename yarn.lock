@@ -1463,7 +1463,7 @@ __metadata:
     hardhat: ^2.12.2
     hardhat-contract-sizer: ^2.6.1
     hardhat-gas-reporter: ^1.0.9
-    oz-custom: ^1.1.5
+    oz-custom: ^1.1.5-a
     prettier: ^2.7.1
     prettier-plugin-solidity: ^1.0.0-rc.1
     solhint: ^3.3.7
@@ -5700,7 +5700,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"oz-custom@npm:^1.1.5":
+"oz-custom@npm:^1.1.5-a":
   version: 1.1.5
   resolution: "oz-custom@npm:1.1.5"
   dependencies:
