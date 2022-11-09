@@ -28,9 +28,9 @@ abstract contract Cloner is ICloner {
         return __implement.fromFirst20Bytes();
     }
 
-    function cloneOf(
+    function _cloneOf(
         bytes32 salt_
-    ) external view returns (address clone, bool isCloned) {
+    ) internal view returns (address clone, bool isCloned) {
         clone = implement().predictDeterministicAddress(salt_);
         isCloned = clone.code.length != 0;
     }

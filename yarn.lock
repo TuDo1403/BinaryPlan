@@ -928,6 +928,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@openzeppelin/contracts-upgradeable@npm:^4.8.0":
+  version: 4.8.0
+  resolution: "@openzeppelin/contracts-upgradeable@npm:4.8.0"
+  checksum: c39f3a719830c068d0ae413a8beee4072fa19f777b55bf6155fe21023414eab0633a641318845ac50929837b71848de1efbd00d4c181ddd6d8b735ceb0a82070
+  languageName: node
+  linkType: hard
+
 "@openzeppelin/contracts@npm:^4.7.3":
   version: 4.7.3
   resolution: "@openzeppelin/contracts@npm:4.7.3"
@@ -1193,7 +1200,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/chai@npm:*, @types/chai@npm:^4.2.0, @types/chai@npm:^4.3.3":
+"@types/chai@npm:*, @types/chai@npm:^4.2.0, @types/chai@npm:^4.3.4":
   version: 4.3.4
   resolution: "@types/chai@npm:4.3.4"
   checksum: 571184967beb03bf64c4392a13a7d44e72da9af5a1e83077ff81c39cf59c0fda2a5c78d2005084601cf8f3d11726608574d8b5b4a0e3e9736792807afd926cd0
@@ -1443,20 +1450,20 @@ __metadata:
     "@nomicfoundation/hardhat-toolbox": ^2.0.0
     "@nomiclabs/hardhat-ethers": ^2.2.1
     "@nomiclabs/hardhat-etherscan": ^3.1.2
-    "@openzeppelin/contracts-upgradeable": ^4.7.3
+    "@openzeppelin/contracts-upgradeable": ^4.8.0
     "@openzeppelin/hardhat-upgrades": ^1.21.0
     "@typechain/ethers-v5": ^10.1.1
     "@typechain/hardhat": ^6.1.4
-    "@types/chai": ^4.3.3
+    "@types/chai": ^4.3.4
     "@types/mocha": ^10.0.0
     "@types/node": ^18.11.9
-    chai: ^4.3.6
+    chai: ^4.3.7
     dotenv: ^16.0.3
     ethers: ^5.7.2
     hardhat: ^2.12.2
     hardhat-contract-sizer: ^2.6.1
     hardhat-gas-reporter: ^1.0.9
-    oz-custom: ^1.1.4-e
+    oz-custom: ^1.1.5
     prettier: ^2.7.1
     prettier-plugin-solidity: ^1.0.0-rc.1
     solhint: ^3.3.7
@@ -2137,7 +2144,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"chai@npm:^4.2.0, chai@npm:^4.3.6":
+"chai@npm:^4.2.0, chai@npm:^4.3.7":
   version: 4.3.7
   resolution: "chai@npm:4.3.7"
   dependencies:
@@ -5693,7 +5700,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"oz-custom@npm:^1.1.4-e":
+"oz-custom@npm:^1.1.5":
   version: 1.1.5
   resolution: "oz-custom@npm:1.1.5"
   dependencies:

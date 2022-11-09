@@ -13,7 +13,7 @@ contract ReferralTreeFactory is Base, Cloner {
     constructor(
         IAuthority authority_,
         address implement_
-    ) payable Cloner(implement_) Base(authority_, 0) {}
+    ) payable Cloner(implement_) Base(authority_, Roles.FACTORY_ROLE) {}
 
     function setImplement(
         address implement_
@@ -29,5 +29,13 @@ contract ReferralTreeFactory is Base, Cloner {
         );
 
         return _clone(salt, IBinaryPlan.init.selector, abi.encode(root_));
+    }
+
+    function cloneOf(address root_) external view returns (address, bool) {
+        bytes32 salt = keccak256(
+            abi.encodePacked(root_, address(this), VERSION)
+        );
+
+        return _cloneOf(salt);
     }
 }

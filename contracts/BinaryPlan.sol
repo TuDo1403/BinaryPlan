@@ -11,15 +11,22 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
     uint256 public constant PERCENTAGE_FRACTION = 10_000;
     uint256 public constant MAXIMUM_BONUS_PERCENTAGE = 3_000_000;
 
+    IAuthority public immutable cachedAuthority;
+
     Bonus public bonusRate;
     mapping(address => uint256) public indices;
     mapping(address => Account) public accounts;
     mapping(uint256 => address) public binaryHeap;
 
-    constructor(IAuthority authority_) payable Base(authority_, 0) {}
+    constructor(IAuthority authority_) payable Base(authority_, 0) {
+        cachedAuthority = authority_;
+    }
 
     function init(address root_) external initializer {
         binaryHeap[1] = root_;
+        indices[root_] = 1;
+        __updateAuthority(cachedAuthority);
+        _checkRole(Roles.FACTORY_ROLE, msg.sender);
     }
 
     function root() external view returns (address) {
@@ -63,7 +70,7 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         address referrer,
         address referree,
         bool isLeft
-    ) external {
+    ) external onlyRole(Roles.OPERATOR_ROLE) {
         require(
             referree != address(0) && referrer != address(0),
             "BINARY_PLAN: NON_ZERO_ADDRESS"

@@ -2,59 +2,94 @@
 
 pragma solidity >=0.7.0 <0.9.0;
 
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/presets/ERC721PresetMinterPauserAutoIdUpgradeable.sol";
 
-contract aifitnessCollection is ERC721Enumerable, Ownable {
-    using Strings for uint256;
+import "@openzeppelin/contracts-upgradeable/interfaces/IERC20Upgradeable.sol";
 
-    string public baseURI;
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+
+contract NFTCollection is UUPSUpgradeable, ERC721PresetMinterPauserAutoIdUpgradeable {
+    using StringsUpgradeable for uint256;
+    using SafeERC20Upgradeable for IERC20Upgradeable;
+
+    /// @dev value is equal to keccak256("NFTCollection_v1")
+    bytes32 public constant VERSION =
+        0xc9a7076c8ec22a28cd00112775315d13dbe8d429256fef8fa1cbbdcc8105d2f0;
+
+    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
+    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
+
     string public baseExtension = ".json";
-    uint256 public cost = 0.001 ether;
-    uint256 public maxSupply = 10000;
+
+    address public owner;
+
+    uint256 public cost = 300 ether;
+    uint256 public maxSupply = 10_000;
     uint256 public maxMintAmount = 200;
-    bool public paused = false;
+
+    IERC20Upgradeable public busdContract;
+
     mapping(address => bool) public whitelisted;
 
-    constructor(
-        string memory _name,
-        string memory _symbol,
-        string memory _initBaseURI
-    ) ERC721(_name, _symbol) {
-        setBaseURI(_initBaseURI);
-        mint(msg.sender, 1);
+    function init(
+        string calldata name_,
+        string calldata symbol_,
+        string calldata baseTokenURI_,
+        IERC20Upgradeable busdContract_
+    ) external initializer {
+        address sender = _msgSender();
+        owner = sender;
+        busdContract = busdContract_;
+
+        __ERC721PresetMinterPauserAutoId_init(name_, symbol_, baseTokenURI_);
+
+        _grantRole(OPERATOR_ROLE, sender);
+
+        for (uint256 i; i < 198; ) {
+            _mint(sender, i);
+            unchecked {
+                ++i;
+            }
+        }
     }
 
-    event MintItem(uint indexed itemId, uint256 indexed tokenId, address owner);
-
-    // internal
-    function _baseURI() internal view virtual override returns (string memory) {
-        return baseURI;
-    }
+    event MintItem(
+        uint256 indexed itemId,
+        uint256 indexed tokenId,
+        address owner
+    );
 
     // public
-    function mint(address _to, uint256 _mintAmount) public payable {
+    function mint(address _to, uint256 _mintAmount) external whenNotPaused {
         uint256 supply = totalSupply();
-        require(!paused);
         require(_mintAmount > 0);
         require(_mintAmount <= maxMintAmount);
         require(supply + _mintAmount <= maxSupply);
 
-        if (msg.sender != owner()) {
-            if (whitelisted[msg.sender] != true) {
-                require(msg.value >= cost * _mintAmount);
-                payable(owner()).transfer(msg.value);
+        address sender = _msgSender();
+
+        if (!hasRole(MINTER_ROLE, sender)) {
+            if (whitelisted[sender] != true) {
+                busdContract.safeTransferFrom(
+                    sender,
+                    owner,
+                    cost * _mintAmount
+                );
             }
         }
 
-        for (uint256 i = 1; i <= _mintAmount; i++) {
-            _safeMint(_to, supply + i);
+        for (uint256 i = 1; i <= _mintAmount; ) {
+            unchecked {
+                _safeMint(_to, supply + i);
+                ++i;
+            }
         }
     }
 
     function walletOfOwner(
         address _owner
-    ) public view returns (uint256[] memory) {
+    ) external view returns (uint256[] memory) {
         uint256 ownerTokenCount = balanceOf(_owner);
         uint256[] memory tokenIds = new uint256[](ownerTokenCount);
         for (uint256 i; i < ownerTokenCount; i++) {
@@ -85,38 +120,44 @@ contract aifitnessCollection is ERC721Enumerable, Ownable {
     }
 
     //only owner
-    function setCost(uint256 _newCost) public onlyOwner {
+    function setCost(uint256 _newCost) external onlyRole(DEFAULT_ADMIN_ROLE) {
         cost = _newCost;
     }
 
-    function setmaxMintAmount(uint256 _newmaxMintAmount) public onlyOwner {
+    function setmaxMintAmount(
+        uint256 _newmaxMintAmount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         maxMintAmount = _newmaxMintAmount;
     }
 
-    function setBaseURI(string memory _newBaseURI) public onlyOwner {
-        baseURI = _newBaseURI;
+    function setBaseURI(
+        string memory _newBaseURI
+    ) external onlyRole(OPERATOR_ROLE) {
+        _baseTokenURI = _newBaseURI;
     }
 
     function setBaseExtension(
         string memory _newBaseExtension
-    ) public onlyOwner {
+    ) external onlyRole(OPERATOR_ROLE) {
         baseExtension = _newBaseExtension;
     }
 
-    function pause(bool _state) public onlyOwner {
-        paused = _state;
-    }
-
-    function whitelistUser(address _user) public onlyOwner {
+    function whitelistUser(address _user) external onlyRole(PAUSER_ROLE) {
         whitelisted[_user] = true;
     }
 
-    function removeWhitelistUser(address _user) public onlyOwner {
+    function removeWhitelistUser(address _user) external onlyRole(PAUSER_ROLE) {
         whitelisted[_user] = false;
     }
 
-    function withdraw() public payable onlyOwner {
-        (bool os, ) = payable(owner()).call{value: address(this).balance}("");
-        require(os);
+    function withdraw() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        (bool ok, ) = owner.call{value: address(this).balance}("");
+        require(ok, "NFT: TRANSFER_FAILED");
     }
+
+    function _authorizeUpgrade(
+        address implement_
+    ) internal virtual override onlyRole(UPGRADER_ROLE) {}
+
+    uint256[44] private __gap;
 }

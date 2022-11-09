@@ -1,18 +1,29 @@
-import { ethers } from "hardhat";
+import { Contract, ContractFactory } from "ethers";
+import { ethers, upgrades } from "hardhat";
+import * as dotenv from "dotenv";
+
+dotenv.config()
 
 async function main() {
-  const currentTimestampInSeconds = Math.round(Date.now() / 1000);
-  const ONE_YEAR_IN_SECS = 365 * 24 * 60 * 60;
-  const unlockTime = currentTimestampInSeconds + ONE_YEAR_IN_SECS;
+  const BinaryPlan = await ethers.getContractFactory("BinaryPlan");
+  const binaryPlan = await BinaryPlan.deploy(
+    process.env.AUTHORITY || ""
+  );
 
-  const lockedAmount = ethers.utils.parseEther("1");
+  await binaryPlan.deployed();
 
-  const Lock = await ethers.getContractFactory("Lock");
-  const lock = await Lock.deploy(unlockTime, { value: lockedAmount });
+  console.log(`BinaryPlan deployed to ${binaryPlan.address}`);
 
-  await lock.deployed();
+  // const Factory = await ethers.getContractFactory("ReferralTreeFactory");
+  // const factory = await Factory.deploy(
+  //   process.env.AUTHORITY || "",
+  //   "0x2a84d64763269aDeF396799864E23Ae5Cdb3F3BD"
+  //   // binaryPlan.address
+  // );
 
-  console.log(`Lock with 1 ETH and unlock timestamp ${unlockTime} deployed to ${lock.address}`);
+  // await factory.deployed();
+
+  // console.log(`Factory deployed to ${factory.address}`);
 }
 
 // We recommend this pattern to be able to use async/await everywhere
