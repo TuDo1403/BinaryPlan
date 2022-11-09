@@ -9,7 +9,10 @@ import "@openzeppelin/contracts-upgradeable/interfaces/IERC20Upgradeable.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
-contract NFTCollection is UUPSUpgradeable, ERC721PresetMinterPauserAutoIdUpgradeable {
+contract NFTCollection is
+    UUPSUpgradeable,
+    ERC721PresetMinterPauserAutoIdUpgradeable
+{
     using StringsUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
@@ -20,13 +23,14 @@ contract NFTCollection is UUPSUpgradeable, ERC721PresetMinterPauserAutoIdUpgrade
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
-    string public baseExtension = ".json";
+    string public baseExtension;
+    string public baseTokenURI;
 
     address public owner;
 
-    uint256 public cost = 300 ether;
-    uint256 public maxSupply = 10_000;
-    uint256 public maxMintAmount = 200;
+    uint256 public cost;
+    uint256 public maxSupply;
+    uint256 public maxMintAmount;
 
     IERC20Upgradeable public busdContract;
 
@@ -39,8 +43,14 @@ contract NFTCollection is UUPSUpgradeable, ERC721PresetMinterPauserAutoIdUpgrade
         IERC20Upgradeable busdContract_
     ) external initializer {
         address sender = _msgSender();
+        
         owner = sender;
+        cost = 300 ether;
+        maxSupply = 10_000;
+        maxMintAmount = 200;
+        baseExtension = ".json";
         busdContract = busdContract_;
+        baseTokenURI = baseTokenURI_;
 
         __ERC721PresetMinterPauserAutoId_init(name_, symbol_, baseTokenURI_);
 
@@ -106,7 +116,7 @@ contract NFTCollection is UUPSUpgradeable, ERC721PresetMinterPauserAutoIdUpgrade
             "ERC721Metadata: URI query for nonexistent token"
         );
 
-        string memory currentBaseURI = _baseURI();
+        string memory currentBaseURI = baseTokenURI;
         return
             bytes(currentBaseURI).length > 0
                 ? string(
@@ -133,7 +143,7 @@ contract NFTCollection is UUPSUpgradeable, ERC721PresetMinterPauserAutoIdUpgrade
     function setBaseURI(
         string memory _newBaseURI
     ) external onlyRole(OPERATOR_ROLE) {
-        _baseTokenURI = _newBaseURI;
+        baseTokenURI = _newBaseURI;
     }
 
     function setBaseExtension(
