@@ -2,20 +2,21 @@
 
 pragma solidity ^0.8.4;
 
-import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/IERC721Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
 contract ERC721Staking is
     UUPSUpgradeable,
-    AccessControlUpgradeable,
-    ReentrancyGuardUpgradeable
+    PausableUpgradeable,
+    AccessControlUpgradeable
 {
     using SafeERC20Upgradeable for IERC20Upgradeable;
+    using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
 
     // Interfaces for ERC20 and ERC721
     IERC20Upgradeable public rewardsToken;
@@ -33,35 +34,50 @@ contract ERC721Staking is
     }
 
     bytes32 public constant VERSION = 0x0;
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     // Rewards per hour per token deposited in wei.
     // Rewards are cumulated once every hour.
-    uint256 private rewardsPerHour = 100000;
+    uint256 private rewardsPerHour;
 
     // Mapping of User Address to Staker info
     mapping(address => Staker) public stakers;
     // Mapping of Token Id to staker. Made for the SC to remeber
     // who to send back the ERC721 Token to.
-    mapping(uint256 => address) public stakerAddress;
     mapping(address => uint256[]) public stakedIds;
+    mapping(uint256 => address) public stakerAddress;
 
-    address[] public stakersArray;
+    //address[] public stakersArray;
+    EnumerableSetUpgradeable.AddressSet private __stakers;
 
-    function initialize(IERC721Upgradeable nft_, IERC20Upgradeable rewardToken_)
-        external
-        initializer
-    {
+    function initialize(
+        IERC721Upgradeable nft_,
+        IERC20Upgradeable rewardToken_
+    ) external initializer {
         nftCollection = nft_;
         rewardsToken = rewardToken_;
+        rewardsPerHour = 100_000;
 
         address sender = _msgSender();
+
+        __Pausable_init_unchained();
+
+        _grantRole(PAUSER_ROLE, sender);
         _grantRole(OPERATOR_ROLE, sender);
         _grantRole(UPGRADER_ROLE, sender);
         _grantRole(DEFAULT_ADMIN_ROLE, sender);
 
-        __ReentrancyGuard_init_unchained();
+        __UUPSUpgradeable_init_unchained();
+    }
+
+    function pause() external onlyRole(PAUSER_ROLE) {
+        _pause();
+    }
+
+    function unpause() external onlyRole(PAUSER_ROLE) {
+        _unpause();
     }
 
     // Function to receive Ether. msg.data must be empty
@@ -81,39 +97,40 @@ contract ERC721Staking is
     // increment the amountStaked and map msg.sender to the Token Id of the staked
     // Token to later send back on withdrawal. Finally give timeOfLastUpdate the
     // value of now.
-    function stake(uint256[] calldata _tokenIds) external nonReentrant {
-        if (stakers[msg.sender].amountStaked > 0) {
-            uint256 rewards = calculateRewards(msg.sender);
-            stakers[msg.sender].unclaimedRewards += rewards;
-        } else {
-            stakersArray.push(msg.sender);
-        }
-        uint256 len = _tokenIds.length;
-        for (uint256 i; i < len; ++i) {
-            require(
-                nftCollection.ownerOf(_tokenIds[i]) == msg.sender,
-                "Can't stake tokens you don't own!"
-            );
-            nftCollection.transferFrom(msg.sender, address(this), _tokenIds[i]);
-            stakerAddress[_tokenIds[i]] = msg.sender;
-        }
-        stakers[msg.sender].amountStaked += len;
-        stakers[msg.sender].timeOfLastUpdate = block.timestamp;
+    function stake(uint256[] calldata _tokenIds) external whenNotPaused {
+        address sender = _msgSender();
+        Staker memory staker = stakers[sender];
+        if (staker.amountStaked != 0)
+            staker.unclaimedRewards += calculateRewards(sender);
+        else __stakers.add(sender);
 
-        uint256 length = _tokenIds.length;
-        for (uint256 i; i < length; ) {
-            stakedIds[msg.sender].push(_tokenIds[i]);
+        uint256 len = _tokenIds.length;
+        uint256 tokenId;
+        IERC721Upgradeable nft = nftCollection;
+        for (uint256 i; i < len; ) {
+            tokenId = _tokenIds[i];
+            stakerAddress[tokenId] = sender;
+            stakedIds[sender].push(tokenId);
+
+            nft.safeTransferFrom(sender, address(this), tokenId);
             unchecked {
                 ++i;
             }
         }
+
+        staker.amountStaked += len;
+        staker.timeOfLastUpdate = block.timestamp;
+
+        stakers[sender] = staker;
     }
 
-    function getStakedIds(address account_)
-        external
-        view
-        returns (uint256[] memory)
-    {
+    function getStakers() external view returns (address[] memory) {
+        return __stakers.values();
+    }
+
+    function getStakedIds(
+        address account_
+    ) external view returns (uint256[] memory) {
         return stakedIds[account_];
     }
 
@@ -121,48 +138,39 @@ contract ERC721Staking is
     // calculate the rewards and store them in the unclaimedRewards and for each
     // ERC721 Token in param: check if msg.sender is the original staker, decrement
     // the amountStaked of the user and transfer the ERC721 token back to them
-    function unStake(uint256[] calldata _tokenIds) external nonReentrant {
-        Staker memory staker = stakers[msg.sender];
+    function unStake(uint256[] calldata _tokenIds) external whenNotPaused {
+        address sender = _msgSender();
+        require(sender == tx.origin && sender.code.length == 0, "ONLY_EOA");
+        Staker memory staker = stakers[sender];
         require(staker.amountStaked != 0, "You have no tokens staked");
-        uint256 rewards = calculateRewards(msg.sender);
+        uint256 rewards = calculateRewards(sender);
         staker.unclaimedRewards += rewards;
         uint256 len = _tokenIds.length;
         uint256 tokenId;
 
         IERC721Upgradeable nft = nftCollection;
+        uint256 stakerLength;
+        unchecked {
+            stakerLength = __stakers.length() - 1;
+        }
         for (uint256 i; i < len; ) {
             tokenId = _tokenIds[i];
-            require(stakerAddress[tokenId] == msg.sender);
-
+            require(stakerAddress[tokenId] == sender);
             delete stakerAddress[tokenId];
 
-            nft.safeTransferFrom(address(this), msg.sender, tokenId);
+            nft.safeTransferFrom(address(this), sender, tokenId);
 
             unchecked {
                 ++i;
             }
         }
+
+        __stakers.remove(sender);
 
         staker.amountStaked -= len;
         staker.timeOfLastUpdate = block.timestamp;
-        stakers[msg.sender] = staker;
 
-        address stakerAddr;
-        uint256 stakerLength;
-        unchecked {
-            stakerLength = stakersArray.length - 1;
-        }
-
-        for (uint256 i; i < len; ) {
-            stakerAddr = stakersArray[i];
-            if (stakerAddr == msg.sender) {
-                stakersArray[stakerLength] = stakerAddr;
-                stakersArray.pop();
-            }
-            unchecked {
-                ++i;
-            }
-        }
+        stakers[sender] = staker;
     }
 
     // Calculate rewards for the msg.sender, check if there are any rewards
@@ -180,16 +188,19 @@ contract ERC721Staking is
     // Set the rewardsPerHour variable
     // Because the rewards are calculated passively, the owner has to first update the rewards
     // to all the stakers, witch could result in very heavy load and expensive transactions
-    function setRewardsPerHour(uint256 _newValue)
-        public
-        onlyRole(OPERATOR_ROLE)
-    {
-        address[] memory _stakers = stakersArray;
-        uint256 len = _stakers.length;
-        for (uint256 i; i < len; ++i) {
-            address user = _stakers[i];
+    function setRewardsPerHour(
+        uint256 _newValue
+    ) public onlyRole(OPERATOR_ROLE) {
+        address sender = _msgSender();
+        uint256 len = __stakers.length();
+        address user;
+        for (uint256 i; i < len; ) {
+            user = __stakers.at(i);
             stakers[user].unclaimedRewards += calculateRewards(user);
-            stakers[msg.sender].timeOfLastUpdate = block.timestamp;
+            stakers[sender].timeOfLastUpdate = block.timestamp;
+            unchecked {
+                ++i;
+            }
         }
         rewardsPerHour = _newValue;
     }
@@ -198,11 +209,9 @@ contract ERC721Staking is
     // View //
     //////////
 
-    function userStakeInfo(address _user)
-        public
-        view
-        returns (uint256 _tokensStaked, uint256 _availableRewards)
-    {
+    function userStakeInfo(
+        address _user
+    ) public view returns (uint256 _tokensStaked, uint256 _availableRewards) {
         return (stakers[_user].amountStaked, availableRewards(_user));
     }
 
@@ -210,9 +219,7 @@ contract ERC721Staking is
         if (stakers[_user].amountStaked == 0) {
             return stakers[_user].unclaimedRewards;
         }
-        uint256 _rewards = stakers[_user].unclaimedRewards +
-            calculateRewards(_user);
-        return _rewards;
+        return stakers[_user].unclaimedRewards + calculateRewards(_user);
     }
 
     /////////////
@@ -222,21 +229,16 @@ contract ERC721Staking is
     // Calculate rewards for param _staker by calculating the time passed
     // since last update in hours and mulitplying it to ERC721 Tokens Staked
     // and rewardsPerHour.
-    function calculateRewards(address _staker)
-        internal
-        view
-        returns (uint256 _rewards)
-    {
+    function calculateRewards(
+        address _staker
+    ) internal view returns (uint256 _rewards) {
         Staker memory staker = stakers[_staker];
         return (((
             ((block.timestamp - staker.timeOfLastUpdate) * staker.amountStaked)
         ) * rewardsPerHour) / 3600);
     }
 
-    function _authorizeUpgrade(address implement_)
-        internal
-        virtual
-        override
-        onlyRole(UPGRADER_ROLE)
-    {}
+    function _authorizeUpgrade(
+        address implement_
+    ) internal virtual override onlyRole(UPGRADER_ROLE) {}
 }
