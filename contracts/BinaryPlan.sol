@@ -38,11 +38,9 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         return binaryHeap[1];
     }
 
-    function getTree(address root_)
-        external
-        view
-        returns (address[] memory tree)
-    {
+    function getTree(
+        address root_
+    ) external view returns (address[] memory tree) {
         Account memory account = accounts[root_];
         uint256 level = account.leftHeight >= account.rightHeight
             ? account.leftHeight
@@ -165,11 +163,10 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         return maxReceived > received ? received : maxReceived;
     }
 
-    function __isLeftBranch(address leaf, address root_)
-        private
-        view
-        returns (bool)
-    {
+    function __isLeftBranch(
+        address leaf,
+        address root_
+    ) private view returns (bool) {
         uint256 leafIndex = indices[leaf];
         uint256 numPath = __levelOf(leafIndex) - __levelOf(indices[root_]) - 1; // x levels requires x - 1 steps
         return (leafIndex >> numPath) & 0x1 == 0;
@@ -179,11 +176,9 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         return binaryHeap[indices[account_] >> 1];
     }
 
-    function __emptyLeftChildIndexOf(address account_)
-        private
-        view
-        returns (uint256 idx)
-    {
+    function __emptyLeftChildIndexOf(
+        address account_
+    ) private view returns (uint256 idx) {
         if (account_ == address(0)) return 1;
         while (account_ != address(0))
             account_ = binaryHeap[__leftChildIndexOf(account_)];
@@ -191,11 +186,9 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         return idx;
     }
 
-    function __emptyRightChildIndexOf(address account_)
-        private
-        view
-        returns (uint256 idx)
-    {
+    function __emptyRightChildIndexOf(
+        address account_
+    ) private view returns (uint256 idx) {
         if (account_ == address(0)) return 1;
         while (account_ != address(0))
             account_ = binaryHeap[__rightChildIndexOf(account_)];
@@ -203,19 +196,15 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         return idx;
     }
 
-    function __leftChildIndexOf(address account_)
-        private
-        view
-        returns (uint256)
-    {
+    function __leftChildIndexOf(
+        address account_
+    ) private view returns (uint256) {
         return (indices[account_] << 1);
     }
 
-    function __rightChildIndexOf(address account_)
-        private
-        view
-        returns (uint256)
-    {
+    function __rightChildIndexOf(
+        address account_
+    ) private view returns (uint256) {
         unchecked {
             return (indices[account_] << 1) + 1;
         }
