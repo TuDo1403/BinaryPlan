@@ -2,18 +2,24 @@
 
 pragma solidity ^0.8.4;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/IERC721Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 
-contract ERC721Staking is Ownable, ReentrancyGuard {
-    using SafeERC20 for IERC20;
+contract ERC721Staking is
+    UUPSUpgradeable,
+    AccessControlUpgradeable,
+    ReentrancyGuardUpgradeable
+{
+    using SafeERC20Upgradeable for IERC20Upgradeable;
 
     // Interfaces for ERC20 and ERC721
-    IERC20 public immutable rewardsToken;
-    IERC721 public immutable nftCollection;
+    IERC20Upgradeable public rewardsToken;
+    IERC721Upgradeable public nftCollection;
 
     // Staker info
     struct Staker {
@@ -25,6 +31,10 @@ contract ERC721Staking is Ownable, ReentrancyGuard {
         // calculated each time the user writes to the Smart Contract
         uint256 unclaimedRewards;
     }
+
+    bytes32 public constant VERSION = 0x0;
+    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
+    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     // Rewards per hour per token deposited in wei.
     // Rewards are cumulated once every hour.
@@ -38,10 +48,19 @@ contract ERC721Staking is Ownable, ReentrancyGuard {
 
     address[] public stakersArray;
 
-    // Constructor function
-    constructor(IERC721 _nftCollection, IERC20 _rewardsToken) {
-        nftCollection = _nftCollection;
-        rewardsToken = _rewardsToken;
+    function initialize(IERC721Upgradeable nft_, IERC20Upgradeable rewardToken_)
+        external
+        initializer
+    {
+        nftCollection = nft_;
+        rewardsToken = rewardToken_;
+
+        address sender = _msgSender();
+        _grantRole(OPERATOR_ROLE, sender);
+        _grantRole(UPGRADER_ROLE, sender);
+        _grantRole(DEFAULT_ADMIN_ROLE, sender);
+
+        __ReentrancyGuard_init_unchained();
     }
 
     // Function to receive Ether. msg.data must be empty
@@ -50,8 +69,10 @@ contract ERC721Staking is Ownable, ReentrancyGuard {
     // Fallback function is called when msg.data is not empty
     fallback() external payable {}
 
-    function withdraw() public onlyOwner {
-        payable(msg.sender).transfer(address(this).balance);
+    function withdraw() external onlyRole(OPERATOR_ROLE) {
+        //payable(msg.sender).transfer(address(this).balance);
+        (bool ok, ) = _msgSender().call{value: address(this).balance}("");
+        require(ok, "TRANSFER FAILED");
     }
 
     // If address already has ERC721 Token/s staked, calculate the rewards.
@@ -121,7 +142,10 @@ contract ERC721Staking is Ownable, ReentrancyGuard {
     // Set the rewardsPerHour variable
     // Because the rewards are calculated passively, the owner has to first update the rewards
     // to all the stakers, witch could result in very heavy load and expensive transactions
-    function setRewardsPerHour(uint256 _newValue) public onlyOwner {
+    function setRewardsPerHour(uint256 _newValue)
+        public
+        onlyRole(OPERATOR_ROLE)
+    {
         address[] memory _stakers = stakersArray;
         uint256 len = _stakers.length;
         for (uint256 i; i < len; ++i) {
@@ -136,9 +160,11 @@ contract ERC721Staking is Ownable, ReentrancyGuard {
     // View //
     //////////
 
-    function userStakeInfo(
-        address _user
-    ) public view returns (uint256 _tokensStaked, uint256 _availableRewards) {
+    function userStakeInfo(address _user)
+        public
+        view
+        returns (uint256 _tokensStaked, uint256 _availableRewards)
+    {
         return (stakers[_user].amountStaked, availableRewards(_user));
     }
 
@@ -158,12 +184,21 @@ contract ERC721Staking is Ownable, ReentrancyGuard {
     // Calculate rewards for param _staker by calculating the time passed
     // since last update in hours and mulitplying it to ERC721 Tokens Staked
     // and rewardsPerHour.
-    function calculateRewards(
-        address _staker
-    ) internal view returns (uint256 _rewards) {
+    function calculateRewards(address _staker)
+        internal
+        view
+        returns (uint256 _rewards)
+    {
         Staker memory staker = stakers[_staker];
         return (((
             ((block.timestamp - staker.timeOfLastUpdate) * staker.amountStaked)
         ) * rewardsPerHour) / 3600);
     }
+
+    function _authorizeUpgrade(address implement_)
+        internal
+        virtual
+        override
+        onlyRole(UPGRADER_ROLE)
+    {}
 }

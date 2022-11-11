@@ -36,14 +36,14 @@ contract NFTCollection is
 
     mapping(address => bool) public whitelisted;
 
-    function init(
+    function initialize(
         string calldata name_,
         string calldata symbol_,
         string calldata baseTokenURI_,
         IERC20Upgradeable busdContract_
     ) external initializer {
         address sender = _msgSender();
-        
+
         owner = sender;
         cost = 300 ether;
         maxSupply = 10_000;

@@ -17,6 +17,7 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
     mapping(address => uint256) public indices;
     mapping(address => Account) public accounts;
     mapping(uint256 => address) public binaryHeap;
+    mapping(uint256 => uint256) public levelNodes;
 
     constructor(IAuthority authority_) payable Base(authority_, 0) {
         cachedAuthority = authority_;
@@ -27,6 +28,11 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         indices[root_] = 1;
         __updateAuthority(cachedAuthority);
         _checkRole(Roles.FACTORY_ROLE, msg.sender);
+
+        Bonus memory bonus = bonusRate;
+        bonus.branchRate = 300;
+        bonus.directRate = 300;
+        bonusRate = bonus;
     }
 
     function root() external view returns (address) {
@@ -88,6 +94,12 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
 
         address leaf = referree;
         address root_ = __parentOf(leaf);
+
+        ++levelNodes[__levelOf(position)];
+
+        if (isLeft && accounts[root_].leftHeight != 0) return;
+        else if (accounts[root_].rightHeight != 0) return;
+
         while (root_ != address(0)) {
             if (__isLeftBranch(leaf, root_)) ++accounts[root_].leftHeight;
             else ++accounts[root_].rightHeight;
@@ -111,10 +123,8 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
 
         uint256 bonus;
         address leaf = account;
-        address root_ = leaf;
+        address root_ = __parentOf(leaf);
         while (root_ != address(0)) {
-            root_ = __parentOf(leaf);
-
             if (__isLeftBranch(leaf, root_)) {
                 bonus = accounts[root_].leftBonus;
                 bonus += branchBonus;
@@ -128,6 +138,7 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
             }
 
             leaf = root_;
+            root_ = __parentOf(leaf);
         }
     }
 

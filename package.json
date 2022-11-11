@@ -9,6 +9,7 @@
     "upgrade:goerli": "hardhat run --network goerli scripts/upgrade.ts",
     "upgrade:tomoTest": "hardhat run --network tomoTest scripts/upgrade.ts",
     "verify:bscTest": "hardhat verify --network bscTest",
+    "verify:bsc": "hardhat verify --network bsc",
     "verify:fuji": "hardhat verify --network fuji",
     "verify:goerli": "hardhat verify --network goerli",
     "verify:tomoTest": "hardhat verify --network tomoTest",
