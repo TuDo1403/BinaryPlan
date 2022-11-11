@@ -100,7 +100,8 @@ contract ERC721Staking is
         stakers[msg.sender].amountStaked += len;
         stakers[msg.sender].timeOfLastUpdate = block.timestamp;
 
-        for (uint256 i; i < _tokenIds.length; ) {
+        uint256 length = _tokenIds.length;
+        for (uint256 i; i < length; ) {
             stakedIds[msg.sender].push(_tokenIds[i]);
             unchecked {
                 ++i;
