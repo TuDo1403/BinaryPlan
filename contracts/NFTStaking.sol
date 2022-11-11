@@ -45,13 +45,14 @@ contract ERC721Staking is
     // Mapping of Token Id to staker. Made for the SC to remeber
     // who to send back the ERC721 Token to.
     mapping(uint256 => address) public stakerAddress;
+    mapping(address => uint256[]) public stakedIds;
 
     address[] public stakersArray;
 
-    function initialize(IERC721Upgradeable nft_, IERC20Upgradeable rewardToken_)
-        external
-        initializer
-    {
+    function initialize(
+        IERC721Upgradeable nft_,
+        IERC20Upgradeable rewardToken_
+    ) external initializer {
         nftCollection = nft_;
         rewardsToken = rewardToken_;
 
@@ -98,6 +99,19 @@ contract ERC721Staking is
         }
         stakers[msg.sender].amountStaked += len;
         stakers[msg.sender].timeOfLastUpdate = block.timestamp;
+
+        for (uint256 i; i < _tokenIds.length; ) {
+            stakedIds[msg.sender].push(_tokenIds[i]);
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    function getStakedIds(
+        address account_
+    ) external view returns (uint256[] memory) {
+        return stakedIds[account_];
     }
 
     // Check if user has any ERC721 Tokens Staked and if he tried to withdraw,
@@ -142,10 +156,9 @@ contract ERC721Staking is
     // Set the rewardsPerHour variable
     // Because the rewards are calculated passively, the owner has to first update the rewards
     // to all the stakers, witch could result in very heavy load and expensive transactions
-    function setRewardsPerHour(uint256 _newValue)
-        public
-        onlyRole(OPERATOR_ROLE)
-    {
+    function setRewardsPerHour(
+        uint256 _newValue
+    ) public onlyRole(OPERATOR_ROLE) {
         address[] memory _stakers = stakersArray;
         uint256 len = _stakers.length;
         for (uint256 i; i < len; ++i) {
@@ -160,11 +173,9 @@ contract ERC721Staking is
     // View //
     //////////
 
-    function userStakeInfo(address _user)
-        public
-        view
-        returns (uint256 _tokensStaked, uint256 _availableRewards)
-    {
+    function userStakeInfo(
+        address _user
+    ) public view returns (uint256 _tokensStaked, uint256 _availableRewards) {
         return (stakers[_user].amountStaked, availableRewards(_user));
     }
 
@@ -184,21 +195,16 @@ contract ERC721Staking is
     // Calculate rewards for param _staker by calculating the time passed
     // since last update in hours and mulitplying it to ERC721 Tokens Staked
     // and rewardsPerHour.
-    function calculateRewards(address _staker)
-        internal
-        view
-        returns (uint256 _rewards)
-    {
+    function calculateRewards(
+        address _staker
+    ) internal view returns (uint256 _rewards) {
         Staker memory staker = stakers[_staker];
         return (((
             ((block.timestamp - staker.timeOfLastUpdate) * staker.amountStaked)
         ) * rewardsPerHour) / 3600);
     }
 
-    function _authorizeUpgrade(address implement_)
-        internal
-        virtual
-        override
-        onlyRole(UPGRADER_ROLE)
-    {}
+    function _authorizeUpgrade(
+        address implement_
+    ) internal virtual override onlyRole(UPGRADER_ROLE) {}
 }

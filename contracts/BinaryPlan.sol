@@ -17,7 +17,6 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
     mapping(address => uint256) public indices;
     mapping(address => Account) public accounts;
     mapping(uint256 => address) public binaryHeap;
-    mapping(uint256 => uint256) public levelNodes;
 
     constructor(IAuthority authority_) payable Base(authority_, 0) {
         cachedAuthority = authority_;
@@ -31,7 +30,7 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
 
         Bonus memory bonus = bonusRate;
         bonus.branchRate = 300;
-        bonus.directRate = 300;
+        bonus.directRate = 600;
         bonusRate = bonus;
     }
 
@@ -39,9 +38,11 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         return binaryHeap[1];
     }
 
-    function getTree(
-        address root_
-    ) external view returns (address[] memory tree) {
+    function getTree(address root_)
+        external
+        view
+        returns (address[] memory tree)
+    {
         Account memory account = accounts[root_];
         uint256 level = account.leftHeight >= account.rightHeight
             ? account.leftHeight
@@ -91,18 +92,24 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         binaryHeap[position] = referree;
         indices[referree] = position;
         accounts[referree].directReferrer = referrer;
+        accounts[referrer].directPercentage += bonusRate.directRate;
 
         address leaf = referree;
         address root_ = __parentOf(leaf);
 
-        ++levelNodes[__levelOf(position)];
+        //++levelNodes[__levelOf(position)];
 
         if (isLeft && accounts[root_].leftHeight != 0) return;
         else if (accounts[root_].rightHeight != 0) return;
 
         while (root_ != address(0)) {
-            if (__isLeftBranch(leaf, root_)) ++accounts[root_].leftHeight;
-            else ++accounts[root_].rightHeight;
+            if (__isLeftBranch(leaf, root_)) {
+                ++accounts[root_].leftHeight;
+                ++accounts[root_].numLeftLeaves;
+            } else {
+                ++accounts[root_].rightHeight;
+                ++accounts[root_].numRightLeaves;
+            }
             leaf = root_;
             root_ = __parentOf(leaf);
         }
@@ -111,30 +118,33 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
     function updateVolume(address account, uint256 volume) external {
         Account memory _account = accounts[account];
         if (_account.maxVolume < volume) _account.maxVolume = volume;
-        address directReferrer = _account.directReferrer;
+        // address directReferrer = _account.directReferrer;
         accounts[account] = _account;
 
-        Bonus memory _bonusRate = bonusRate;
-        uint256 percentageFraction = PERCENTAGE_FRACTION;
-        uint256 directBonus = (volume * _bonusRate.directRate) /
-            percentageFraction;
-        uint256 branchBonus = (volume * _bonusRate.branchRate) /
-            percentageFraction;
+        //Bonus memory _bonusRate = bonusRate;
+        // uint256 percentageFraction = PERCENTAGE_FRACTION;
+        // uint256 directBonus = (volume * _bonusRate.directRate) /
+        //     percentageFraction;
+        // uint256 branchBonus = (volume * _bonusRate.branchRate) /
+        //     percentageFraction;
 
-        uint256 bonus;
+        //uint256 bonus;
         address leaf = account;
         address root_ = __parentOf(leaf);
+
         while (root_ != address(0)) {
             if (__isLeftBranch(leaf, root_)) {
-                bonus = accounts[root_].leftBonus;
-                bonus += branchBonus;
-                if (root_ == directReferrer) bonus += directBonus;
-                accounts[root_].leftBonus = bonus;
+                //bonus = accounts[root_].leftBonus;
+                //bonus += branchBonus;
+                accounts[root_].leftVolume += volume;
+                //if (root_ == directReferrer) bonus += directBonus;
+                //accounts[root_].leftBonus = bonus;
             } else {
-                bonus = accounts[root_].rightBonus;
-                bonus += branchBonus;
-                if (root_ == directReferrer) bonus += directBonus;
-                accounts[root_].rightBonus = bonus;
+                //bonus = accounts[root_].rightBonus;
+                accounts[root_].rightVolume += volume;
+                //bonus += branchBonus;
+                //if (root_ == directReferrer) bonus += directBonus;
+                //accounts[root_].rightBonus = bonus;
             }
 
             leaf = root_;
@@ -144,20 +154,37 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
 
     function withdrawableAmt(address account_) public view returns (uint256) {
         Account memory account = accounts[account_];
+
+        uint256 branchRate = bonusRate.branchRate;
+        uint256 bonusPercentage = account.directPercentage;
+        uint256 level = __levelOf(indices[account_]);
+        uint256 numLeftLeaves = account.numLeftLeaves;
+        uint256 numRightLeaves = account.numRightLeaves;
+
+        while (level > 1) {
+            //if (levelNodes[level] != 1 << level) break;
+
+            if (leftChild.numLeftLeaves + leftChild.numRightLeaves != )
+            level += 1;
+            bonusPercentage += branchRate;
+        }
+
+        uint256 bonus = account.leftVolume < account.rightVolume
+            ? account.rightVolume
+            : account.leftVolume;
+        uint256 percentageFraction = PERCENTAGE_FRACTION;
         uint256 maxReceived = (account.maxVolume * MAXIMUM_BONUS_PERCENTAGE) /
-            PERCENTAGE_FRACTION;
-        uint256 received;
-        if (account.leftHeight >= account.rightHeight)
-            received = account.rightBonus;
-        else received = account.leftBonus;
-        received = received >= maxReceived ? maxReceived : received;
-        return received;
+            percentageFraction;
+        uint256 received = (bonus * bonusPercentage) / percentageFraction;
+        
+        return maxReceived > received ? received : maxReceived;
     }
 
-    function __isLeftBranch(
-        address leaf,
-        address root_
-    ) private view returns (bool) {
+    function __isLeftBranch(address leaf, address root_)
+        private
+        view
+        returns (bool)
+    {
         uint256 leafIndex = indices[leaf];
         uint256 numPath = __levelOf(leafIndex) - __levelOf(indices[root_]) - 1; // x levels requires x - 1 steps
         return (leafIndex >> numPath) & 0x1 == 0;
@@ -167,9 +194,11 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         return binaryHeap[indices[account_] >> 1];
     }
 
-    function __emptyLeftChildIndexOf(
-        address account_
-    ) private view returns (uint256 idx) {
+    function __emptyLeftChildIndexOf(address account_)
+        private
+        view
+        returns (uint256 idx)
+    {
         if (account_ == address(0)) return 1;
         while (account_ != address(0)) {
             idx = __leftChildIndexOf(account_);
@@ -178,9 +207,11 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         return idx;
     }
 
-    function __emptyRightChildIndexOf(
-        address account_
-    ) private view returns (uint256 idx) {
+    function __emptyRightChildIndexOf(address account_)
+        private
+        view
+        returns (uint256 idx)
+    {
         if (account_ == address(0)) return 1;
         while (account_ != address(0)) {
             idx = __rightChildIndexOf(account_);
@@ -189,15 +220,19 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         return idx;
     }
 
-    function __leftChildIndexOf(
-        address account_
-    ) private view returns (uint256) {
+    function __leftChildIndexOf(address account_)
+        private
+        view
+        returns (uint256)
+    {
         return (indices[account_] << 1);
     }
 
-    function __rightChildIndexOf(
-        address account_
-    ) private view returns (uint256) {
+    function __rightChildIndexOf(address account_)
+        private
+        view
+        returns (uint256)
+    {
         return (indices[account_] << 1) + 1;
     }
 
