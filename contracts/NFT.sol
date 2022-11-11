@@ -56,12 +56,7 @@ contract NFTCollection is
 
         _grantRole(OPERATOR_ROLE, sender);
 
-        for (uint256 i; i < 198; ) {
-            _mint(sender, i);
-            unchecked {
-                ++i;
-            }
-        }
+        _mint(sender, 1);
     }
 
     event MintItem(

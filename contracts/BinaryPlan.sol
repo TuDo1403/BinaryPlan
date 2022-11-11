@@ -98,6 +98,7 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
 
         address leaf = referree;
         address root_ = __parentOf(leaf);
+        uint256 leafLevel = __levelOf(position);
 
         bool updateHeight = true;
         if (isLeft && accounts[root_].leftHeight != 0) updateHeight = false;
@@ -116,7 +117,7 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
                 }
                 if (
                     rootAccount.numLeftLeaves + rootAccount.numRightLeaves ==
-                    1 << __levelOf(indices[root_])
+                    1 << (leafLevel - __levelOf(indices[root_]))
                 ) ++rootAccount.numBalancedLevel;
             }
 

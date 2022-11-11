@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.4;
 
+import "@openzeppelin/contracts-upgradeable/token/ERC721/IERC721ReceiverUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/BitMapsUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
@@ -14,10 +15,12 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 contract ERC721Staking is
     UUPSUpgradeable,
     PausableUpgradeable,
-    AccessControlUpgradeable
+    AccessControlUpgradeable,
+    IERC721ReceiverUpgradeable
 {
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using BitMapsUpgradeable for BitMapsUpgradeable.BitMap;
+    using EnumerableSetUpgradeable for EnumerableSetUpgradeable.UintSet;
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
 
     // Interfaces for ERC20 and ERC721
@@ -48,11 +51,13 @@ contract ERC721Staking is
     mapping(address => Staker) public stakers;
     // Mapping of Token Id to staker. Made for the SC to remeber
     // who to send back the ERC721 Token to.
-    mapping(address => uint256[]) public stakedIds;
+    // mapping(address => uint256[]) public stakedIds;
     mapping(uint256 => address) public stakerAddress;
     mapping(uint256 => uint256) public timeStaked;
 
     BitMapsUpgradeable.BitMap private __isStaked;
+
+    mapping(address => EnumerableSetUpgradeable.UintSet) private __stakedIds;
     EnumerableSetUpgradeable.AddressSet private __stakers;
 
     function initialize(
@@ -115,7 +120,7 @@ contract ERC721Staking is
             tokenId = _tokenIds[i];
             __isStaked.set(tokenId);
             stakerAddress[tokenId] = sender;
-            stakedIds[sender].push(tokenId);
+            __stakedIds[sender].add(tokenId);
             timeStaked[_tokenIds[i]] = block.timestamp;
 
             nft.safeTransferFrom(sender, address(this), tokenId);
@@ -136,12 +141,6 @@ contract ERC721Staking is
 
     function getStakers() external view returns (address[] memory) {
         return __stakers.values();
-    }
-
-    function getStakedIds(
-        address account_
-    ) external view returns (uint256[] memory) {
-        return stakedIds[account_];
     }
 
     // Check if user has any ERC721 Tokens Staked and if he tried to withdraw,
@@ -168,6 +167,8 @@ contract ERC721Staking is
             require(stakerAddress[tokenId] == sender);
             delete stakerAddress[tokenId];
 
+            __stakedIds[sender].remove(tokenId);
+
             nft.safeTransferFrom(address(this), sender, tokenId);
 
             unchecked {
@@ -181,6 +182,12 @@ contract ERC721Staking is
         staker.timeOfLastUpdate = block.timestamp;
 
         stakers[sender] = staker;
+    }
+
+    function stakedIds(
+        address account_
+    ) external view returns (uint256[] memory) {
+        return __stakedIds[account_].values();
     }
 
     // Calculate rewards for the msg.sender, check if there are any rewards
@@ -251,4 +258,13 @@ contract ERC721Staking is
     function _authorizeUpgrade(
         address implement_
     ) internal virtual override onlyRole(UPGRADER_ROLE) {}
+
+    function onERC721Received(
+        address,
+        address,
+        uint256,
+        bytes calldata
+    ) external pure override returns (bytes4) {
+        return this.onERC721Received.selector;
+    }
 }
