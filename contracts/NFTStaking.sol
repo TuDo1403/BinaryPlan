@@ -132,8 +132,11 @@ contract ERC721Staking is
             stakerAddress[_tokenIds[i]] = address(0);
             nftCollection.transferFrom(address(this), msg.sender, _tokenIds[i]);
         }
-        stakers[msg.sender].amountStaked -= len;
-        stakers[msg.sender].timeOfLastUpdate = block.timestamp;
+        Staker memory staker = stakers[msg.sender];
+        staker.amountStaked -= len;
+        staker.timeOfLastUpdate = block.timestamp;
+        stakers[msg.sender] = staker;
+
         for (uint256 i; i < len; ++i) {
             if (stakersArray[i] == msg.sender) {
                 stakersArray[stakersArray.length - 1] = stakersArray[i];
