@@ -4,14 +4,15 @@ pragma solidity 0.8.17;
 interface IBinaryPlan {
     struct Account {
         address directReferrer;
-        uint256 numLeftLeaves;
-        uint256 numRightLeaves;
-        uint256 leftHeight;
-        uint256 rightHeight;
-        uint256 directPercentage;
-        uint256 leftVolume;
-        uint256 rightVolume;
-        uint256 maxVolume;
+        uint96 leftVolume;
+        uint8 leftHeight;
+        uint8 rightHeight;
+        uint128 numLeftLeaves;
+        uint16 directPercentage;
+        uint96 rightVolume;
+        uint8 numBalancedLevel;
+        uint96 maxVolume;
+        uint128 numRightLeaves;
     }
 
     struct Bonus {

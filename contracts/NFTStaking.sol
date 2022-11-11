@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.4;
 
+import "@openzeppelin/contracts-upgradeable/utils/structs/BitMapsUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
@@ -16,6 +17,7 @@ contract ERC721Staking is
     AccessControlUpgradeable
 {
     using SafeERC20Upgradeable for IERC20Upgradeable;
+    using BitMapsUpgradeable for BitMapsUpgradeable.BitMap;
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
 
     // Interfaces for ERC20 and ERC721
@@ -48,8 +50,9 @@ contract ERC721Staking is
     // who to send back the ERC721 Token to.
     mapping(address => uint256[]) public stakedIds;
     mapping(uint256 => address) public stakerAddress;
+    mapping(uint256 => uint256) public timeStaked;
 
-    //address[] public stakersArray;
+    BitMapsUpgradeable.BitMap private __isStaked;
     EnumerableSetUpgradeable.AddressSet private __stakers;
 
     function initialize(
@@ -108,9 +111,12 @@ contract ERC721Staking is
         uint256 tokenId;
         IERC721Upgradeable nft = nftCollection;
         for (uint256 i; i < len; ) {
+            require(!__isStaked.get(tokenId), "STAKED BEFORE");
             tokenId = _tokenIds[i];
+            __isStaked.set(tokenId);
             stakerAddress[tokenId] = sender;
             stakedIds[sender].push(tokenId);
+            timeStaked[_tokenIds[i]] = block.timestamp;
 
             nft.safeTransferFrom(sender, address(this), tokenId);
             unchecked {

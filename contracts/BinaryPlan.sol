@@ -108,6 +108,13 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
                 ++accounts[root_].rightHeight;
                 ++accounts[root_].numRightLeaves;
             }
+            uint256 level = __levelOf(indices[root_]);
+            if (
+                accounts[root_].numLeftLeaves +
+                    accounts[root_].numRightLeaves ==
+                1 << level
+            ) ++accounts[root_].numBalancedLevel;
+
             leaf = root_;
             root_ = __parentOf(leaf);
         }
