@@ -55,10 +55,10 @@ contract ERC721Staking is
     BitMapsUpgradeable.BitMap private __isStaked;
     EnumerableSetUpgradeable.AddressSet private __stakers;
 
-    function initialize(IERC721Upgradeable nft_, IERC20Upgradeable rewardToken_)
-        external
-        initializer
-    {
+    function initialize(
+        IERC721Upgradeable nft_,
+        IERC20Upgradeable rewardToken_
+    ) external initializer {
         nftCollection = nft_;
         rewardsToken = rewardToken_;
         rewardsPerHour = 100_000;
@@ -138,11 +138,9 @@ contract ERC721Staking is
         return __stakers.values();
     }
 
-    function getStakedIds(address account_)
-        external
-        view
-        returns (uint256[] memory)
-    {
+    function getStakedIds(
+        address account_
+    ) external view returns (uint256[] memory) {
         return stakedIds[account_];
     }
 
@@ -200,10 +198,9 @@ contract ERC721Staking is
     // Set the rewardsPerHour variable
     // Because the rewards are calculated passively, the owner has to first update the rewards
     // to all the stakers, witch could result in very heavy load and expensive transactions
-    function setRewardsPerHour(uint256 _newValue)
-        public
-        onlyRole(OPERATOR_ROLE)
-    {
+    function setRewardsPerHour(
+        uint256 _newValue
+    ) public onlyRole(OPERATOR_ROLE) {
         address sender = _msgSender();
         uint256 len = __stakers.length();
         address user;
@@ -222,11 +219,9 @@ contract ERC721Staking is
     // View //
     //////////
 
-    function userStakeInfo(address _user)
-        public
-        view
-        returns (uint256 _tokensStaked, uint256 _availableRewards)
-    {
+    function userStakeInfo(
+        address _user
+    ) public view returns (uint256 _tokensStaked, uint256 _availableRewards) {
         return (stakers[_user].amountStaked, availableRewards(_user));
     }
 
@@ -244,21 +239,16 @@ contract ERC721Staking is
     // Calculate rewards for param _staker by calculating the time passed
     // since last update in hours and mulitplying it to ERC721 Tokens Staked
     // and rewardsPerHour.
-    function calculateRewards(address _staker)
-        internal
-        view
-        returns (uint256 _rewards)
-    {
+    function calculateRewards(
+        address _staker
+    ) internal view returns (uint256 _rewards) {
         Staker memory staker = stakers[_staker];
         return (((
             ((block.timestamp - staker.timeOfLastUpdate) * staker.amountStaked)
         ) * rewardsPerHour) / 3600);
     }
 
-    function _authorizeUpgrade(address implement_)
-        internal
-        virtual
-        override
-        onlyRole(UPGRADER_ROLE)
-    {}
+    function _authorizeUpgrade(
+        address implement_
+    ) internal virtual override onlyRole(UPGRADER_ROLE) {}
 }

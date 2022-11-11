@@ -16,8 +16,8 @@ interface IBinaryPlan {
     }
 
     struct Bonus {
-        uint128 directRate;
-        uint128 branchRate;
+        uint16 directRate;
+        uint16 branchRate;
     }
 
     function init(address root_) external;
@@ -32,7 +32,7 @@ interface IBinaryPlan {
         bool isLeft
     ) external;
 
-    function updateVolume(address account, uint256 volume) external;
+    function updateVolume(address account, uint96 volume) external;
 
     function withdrawableAmt(address account_) external view returns (uint256);
 }

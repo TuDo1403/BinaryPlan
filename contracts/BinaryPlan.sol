@@ -38,14 +38,16 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         return binaryHeap[1];
     }
 
-    function getTree(
-        address root_
-    ) external view returns (address[] memory tree) {
+    function getTree(address root_)
+        external
+        view
+        returns (address[] memory tree)
+    {
         Account memory account = accounts[root_];
         uint256 level = account.leftHeight >= account.rightHeight
             ? account.leftHeight
             : account.rightHeight;
-        uint256 length = (1 << (level + 1));
+        uint256 length = 1 << (level + 1);
         tree = new address[](length);
         __traversePreorder(root_, 1, tree);
     }
@@ -77,80 +79,68 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         bool isLeft
     ) external onlyRole(Roles.OPERATOR_ROLE) {
         require(
-            referree != address(0) && referrer != address(0),
-            "BINARY_PLAN: NON_ZERO_ADDRESS"
+            referree != referrer &&
+                referree != address(0) &&
+                referrer != address(0),
+            "BINARY_PLAN: INVALID_ARGUMENT"
         );
         require(indices[referrer] != 0, "BINARY_PLAN: NON_EXISTED_REF");
         require(indices[referree] == 0, "BINARY_PLAN: EXISTED_IN_TREE");
 
-        uint256 position;
-        if (isLeft) position = __emptyLeftChildIndexOf(referrer);
-        else position = __emptyRightChildIndexOf(referrer);
+        uint256 position = isLeft
+            ? __emptyLeftChildIndexOf(referrer)
+            : __emptyRightChildIndexOf(referrer);
 
         binaryHeap[position] = referree;
+
         indices[referree] = position;
         accounts[referree].directReferrer = referrer;
+
         accounts[referrer].directPercentage += bonusRate.directRate;
 
         address leaf = referree;
         address root_ = __parentOf(leaf);
 
-        //++levelNodes[__levelOf(position)];
+        bool updateHeight = true;
+        if (isLeft && accounts[root_].leftHeight != 0) updateHeight = false;
+        else if (accounts[root_].rightHeight != 0) updateHeight = false;
 
-        if (isLeft && accounts[root_].leftHeight != 0) return;
-        else if (accounts[root_].rightHeight != 0) return;
-
+        Account memory rootAccount;
         while (root_ != address(0)) {
-            if (__isLeftBranch(leaf, root_)) {
-                ++accounts[root_].leftHeight;
-                ++accounts[root_].numLeftLeaves;
-            } else {
-                ++accounts[root_].rightHeight;
-                ++accounts[root_].numRightLeaves;
+            rootAccount = accounts[root_];
+            unchecked {
+                if (__isLeftBranch(leaf, root_)) {
+                    if (updateHeight) ++rootAccount.leftHeight;
+                    ++rootAccount.numLeftLeaves;
+                } else {
+                    if (updateHeight) ++rootAccount.rightHeight;
+                    ++rootAccount.numRightLeaves;
+                }
+                if (
+                    rootAccount.numLeftLeaves + rootAccount.numRightLeaves ==
+                    1 << __levelOf(indices[root_])
+                ) ++rootAccount.numBalancedLevel;
             }
-            uint256 level = __levelOf(indices[root_]);
-            if (
-                accounts[root_].numLeftLeaves +
-                    accounts[root_].numRightLeaves ==
-                1 << level
-            ) ++accounts[root_].numBalancedLevel;
+
+            accounts[root_] = rootAccount;
 
             leaf = root_;
             root_ = __parentOf(leaf);
         }
     }
 
-    function updateVolume(address account, uint256 volume) external {
+    function updateVolume(address account, uint96 volume) external {
         Account memory _account = accounts[account];
         if (_account.maxVolume < volume) _account.maxVolume = volume;
-        // address directReferrer = _account.directReferrer;
         accounts[account] = _account;
 
-        //Bonus memory _bonusRate = bonusRate;
-        // uint256 percentageFraction = PERCENTAGE_FRACTION;
-        // uint256 directBonus = (volume * _bonusRate.directRate) /
-        //     percentageFraction;
-        // uint256 branchBonus = (volume * _bonusRate.branchRate) /
-        //     percentageFraction;
-
-        //uint256 bonus;
         address leaf = account;
         address root_ = __parentOf(leaf);
 
         while (root_ != address(0)) {
-            if (__isLeftBranch(leaf, root_)) {
-                //bonus = accounts[root_].leftBonus;
-                //bonus += branchBonus;
+            if (__isLeftBranch(leaf, root_))
                 accounts[root_].leftVolume += volume;
-                //if (root_ == directReferrer) bonus += directBonus;
-                //accounts[root_].leftBonus = bonus;
-            } else {
-                //bonus = accounts[root_].rightBonus;
-                accounts[root_].rightVolume += volume;
-                //bonus += branchBonus;
-                //if (root_ == directReferrer) bonus += directBonus;
-                //accounts[root_].rightBonus = bonus;
-            }
+            else accounts[root_].rightVolume += volume;
 
             leaf = root_;
             root_ = __parentOf(leaf);
@@ -161,34 +151,25 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         Account memory account = accounts[account_];
 
         uint256 branchRate = bonusRate.branchRate;
-        uint256 bonusPercentage = account.directPercentage;
-        uint256 level = __levelOf(indices[account_]);
-        uint256 numLeftLeaves = account.numLeftLeaves;
-        uint256 numRightLeaves = account.numRightLeaves;
 
-        while (level > 1) {
-            //if (levelNodes[level] != 1 << level) break;
-
-            // if (leftChild.numLeftLeaves + leftChild.numRightLeaves != )
-            level += 1;
-            bonusPercentage += branchRate;
-        }
-
-        uint256 bonus = account.leftVolume < account.rightVolume
-            ? account.rightVolume
-            : account.leftVolume;
         uint256 percentageFraction = PERCENTAGE_FRACTION;
         uint256 maxReceived = (account.maxVolume * MAXIMUM_BONUS_PERCENTAGE) /
             percentageFraction;
+        uint256 bonusPercentage = account.directPercentage +
+            (branchRate * account.numBalancedLevel);
+        uint256 bonus = account.leftVolume < account.rightVolume
+            ? account.rightVolume
+            : account.leftVolume;
         uint256 received = (bonus * bonusPercentage) / percentageFraction;
 
         return maxReceived > received ? received : maxReceived;
     }
 
-    function __isLeftBranch(
-        address leaf,
-        address root_
-    ) private view returns (bool) {
+    function __isLeftBranch(address leaf, address root_)
+        private
+        view
+        returns (bool)
+    {
         uint256 leafIndex = indices[leaf];
         uint256 numPath = __levelOf(leafIndex) - __levelOf(indices[root_]) - 1; // x levels requires x - 1 steps
         return (leafIndex >> numPath) & 0x1 == 0;
@@ -198,38 +179,46 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         return binaryHeap[indices[account_] >> 1];
     }
 
-    function __emptyLeftChildIndexOf(
-        address account_
-    ) private view returns (uint256 idx) {
+    function __emptyLeftChildIndexOf(address account_)
+        private
+        view
+        returns (uint256 idx)
+    {
         if (account_ == address(0)) return 1;
-        while (account_ != address(0)) {
-            idx = __leftChildIndexOf(account_);
-            account_ = binaryHeap[idx];
-        }
+        while (account_ != address(0))
+            account_ = binaryHeap[__leftChildIndexOf(account_)];
+
         return idx;
     }
 
-    function __emptyRightChildIndexOf(
-        address account_
-    ) private view returns (uint256 idx) {
+    function __emptyRightChildIndexOf(address account_)
+        private
+        view
+        returns (uint256 idx)
+    {
         if (account_ == address(0)) return 1;
-        while (account_ != address(0)) {
-            idx = __rightChildIndexOf(account_);
-            account_ = binaryHeap[idx];
-        }
+        while (account_ != address(0))
+            account_ = binaryHeap[__rightChildIndexOf(account_)];
+
         return idx;
     }
 
-    function __leftChildIndexOf(
-        address account_
-    ) private view returns (uint256) {
+    function __leftChildIndexOf(address account_)
+        private
+        view
+        returns (uint256)
+    {
         return (indices[account_] << 1);
     }
 
-    function __rightChildIndexOf(
-        address account_
-    ) private view returns (uint256) {
-        return (indices[account_] << 1) + 1;
+    function __rightChildIndexOf(address account_)
+        private
+        view
+        returns (uint256)
+    {
+        unchecked {
+            return (indices[account_] << 1) + 1;
+        }
     }
 
     function __addLeft(address referrer, address referree) private {
