@@ -56,7 +56,7 @@ const config: HardhatUserConfig = {
                     : []
         },
         bscTest: {
-            url: "https://data-seed-prebsc-1-s3.binance.org:8545",
+            url: "https://bsc-testnet.public.blastapi.io",
             chainId: 97,
             accounts:
                 process.env.PRIVATE_KEY !== undefined
