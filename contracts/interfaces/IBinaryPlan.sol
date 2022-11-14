@@ -7,12 +7,9 @@ interface IBinaryPlan {
         uint96 leftVolume;
         uint8 leftHeight;
         uint8 rightHeight;
-        uint128 numLeftLeaves;
         uint16 directPercentage;
         uint96 rightVolume;
-        uint8 numBalancedLevel;
         uint96 maxVolume;
-        uint128 numRightLeaves;
     }
 
     struct Bonus {
