@@ -37,11 +37,9 @@ contract Swap is
         tokenPrice = initPrice_;
     }
 
-    function updateTreasury(ITreasury treasury_)
-        external
-        override
-        onlyRole(Roles.OPERATOR_ROLE)
-    {
+    function updateTreasury(
+        ITreasury treasury_
+    ) external override onlyRole(Roles.OPERATOR_ROLE) {
         _updateTreasury(treasury_);
     }
 

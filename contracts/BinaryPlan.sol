@@ -22,6 +22,10 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         cachedAuthority = authority_;
     }
 
+    function kill() external onlyRole(Roles.OPERATOR_ROLE) {
+        selfdestruct(payable(msg.sender));
+    }
+
     function init(address root_) external initializer {
         binaryHeap[1] = root_;
         indices[root_] = 1;
@@ -150,7 +154,10 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         }
     }
 
-    function updateVolume(address account, uint96 volume) external {
+    function updateVolume(
+        address account,
+        uint96 volume
+    ) external onlyRole(Roles.OPERATOR_ROLE) {
         Account memory _account = accounts[account];
         if (_account.maxVolume < volume) _account.maxVolume = volume;
         accounts[account] = _account;
