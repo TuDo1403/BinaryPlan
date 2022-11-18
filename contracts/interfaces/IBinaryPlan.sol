@@ -32,5 +32,7 @@ interface IBinaryPlan {
 
     function updateVolume(address account, uint96 volume) external;
 
-    function withdrawableAmt(address account_) external returns (uint256);
+    function withdrawableAmt(address account_) external view returns (uint256);
+
+    function updateClaimableAmt(address account_, uint256 claimed_) external;
 }

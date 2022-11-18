@@ -43,9 +43,11 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         return binaryHeap[1];
     }
 
-    function getTree(
-        address root_
-    ) external view returns (address[] memory tree) {
+    function getTree(address root_)
+        external
+        view
+        returns (address[] memory tree)
+    {
         Account memory account = accounts[root_];
         uint256 level = account.leftHeight >= account.rightHeight
             ? account.leftHeight
@@ -152,10 +154,10 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         }
     }
 
-    function updateVolume(
-        address account,
-        uint96 volume
-    ) external onlyRole(Roles.OPERATOR_ROLE) {
+    function updateVolume(address account, uint96 volume)
+        external
+        onlyRole(Roles.OPERATOR_ROLE)
+    {
         Account memory _account = accounts[account];
 
         accounts[_account.directReferrer].directBonus += uint96(
@@ -179,9 +181,11 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         }
     }
 
-    function withdrawableAmt(
-        address account_
-    ) public returns (uint256 claimable) {
+    function withdrawableAmt(address account_)
+        public
+        view
+        returns (uint256 claimable)
+    {
         Account memory account = accounts[account_];
 
         uint256 branchRate = bonusRate.branchRate;
@@ -209,17 +213,19 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
 
         claimable = maxReceived > received ? received : maxReceived;
 
-        if (claimable > account.claimed) {
-            claimable -= account.claimed;
-            account.claimed += uint96(claimable);
-        } else claimable = 0;
-
-        accounts[account_] = account;
+        if (claimable > account.claimed) claimable -= account.claimed;
+        else return 0;
     }
 
-    function numBalancedLevel(
-        address account_
-    ) external view returns (uint256 numBalanced) {
+    function updateClaimableAmt(address account_, uint256 claimed_) external onlyRole(Roles.OPERATOR_ROLE) {
+        accounts[account_].claimed += uint96(claimed_);
+    }
+
+    function numBalancedLevel(address account_)
+        external
+        view
+        returns (uint256 numBalanced)
+    {
         Account memory account = accounts[account_];
         uint256 minHeight = account.leftHeight < account.rightHeight
             ? account.leftHeight
@@ -234,26 +240,29 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         }
     }
 
-    function isIndexLeftBranch(
-        uint256 leafIdx,
-        uint256 rootIdx
-    ) public pure returns (bool) {
+    function isIndexLeftBranch(uint256 leafIdx, uint256 rootIdx)
+        public
+        pure
+        returns (bool)
+    {
         return rootIdx >> 1 == leafIdx;
     }
 
-    function isLeftBranch(
-        address leaf_,
-        address root_
-    ) public view returns (bool) {
+    function isLeftBranch(address leaf_, address root_)
+        public
+        view
+        returns (bool)
+    {
         uint256 leafIndex = indices[leaf_];
         uint256 rootIndex = indices[root_];
         return rootIndex >> 1 == leafIndex;
     }
 
-    function __isLeftBranch(
-        address leaf,
-        address root_
-    ) private view returns (bool) {
+    function __isLeftBranch(address leaf, address root_)
+        private
+        view
+        returns (bool)
+    {
         uint256 leafIndex = indices[leaf];
         uint256 numPath = __levelOf(leafIndex) - __levelOf(indices[root_]) - 1; // x levels requires x - 1 steps
         return (leafIndex >> numPath) & 0x1 == 0;
@@ -263,9 +272,11 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         return binaryHeap[indices[account_] >> 1];
     }
 
-    function __emptyLeftChildIndexOf(
-        address account_
-    ) private view returns (uint256 idx) {
+    function __emptyLeftChildIndexOf(address account_)
+        private
+        view
+        returns (uint256 idx)
+    {
         if (account_ == address(0)) return 1;
         while (account_ != address(0)) {
             idx = __leftChildIndexOf(account_);
@@ -274,9 +285,11 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         return idx;
     }
 
-    function __emptyRightChildIndexOf(
-        address account_
-    ) private view returns (uint256 idx) {
+    function __emptyRightChildIndexOf(address account_)
+        private
+        view
+        returns (uint256 idx)
+    {
         if (account_ == address(0)) return 1;
         while (account_ != address(0)) {
             idx = __rightChildIndexOf(account_);
@@ -285,15 +298,19 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         return idx;
     }
 
-    function __leftChildIndexOf(
-        address account_
-    ) private view returns (uint256) {
+    function __leftChildIndexOf(address account_)
+        private
+        view
+        returns (uint256)
+    {
         return (indices[account_] << 1);
     }
 
-    function __rightChildIndexOf(
-        address account_
-    ) private view returns (uint256) {
+    function __rightChildIndexOf(address account_)
+        private
+        view
+        returns (uint256)
+    {
         unchecked {
             return (indices[account_] << 1) + 1;
         }
