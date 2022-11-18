@@ -99,8 +99,6 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         indices[referree] = position;
         accounts[referree].directReferrer = referrer;
 
-        accounts[referrer].directPercentage += bonusRate.directRate;
-
         address leaf = referree;
         address root_ = __parentOf(leaf);
         uint256 leafLevel = __levelOf(position);
@@ -159,7 +157,13 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         uint96 volume
     ) external onlyRole(Roles.OPERATOR_ROLE) {
         Account memory _account = accounts[account];
+
+        accounts[_account.directReferrer].directBonus += uint96(
+            (volume * bonusRate.directRate) / PERCENTAGE_FRACTION
+        );
+
         if (_account.maxVolume < volume) _account.maxVolume = volume;
+
         accounts[account] = _account;
 
         address leaf = account;
@@ -175,7 +179,9 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         }
     }
 
-    function withdrawableAmt(address account_) public view returns (uint256) {
+    function withdrawableAmt(
+        address account_
+    ) public returns (uint256 claimable) {
         Account memory account = accounts[account_];
 
         uint256 branchRate = bonusRate.branchRate;
@@ -186,7 +192,7 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         uint256 minHeight = account.leftHeight < account.rightHeight
             ? account.leftHeight
             : account.rightHeight;
-        uint256 bonusPercentage = account.directPercentage;
+        uint256 bonusPercentage;
         uint256 idx = indices[account_];
         for (uint256 i = 1; i <= minHeight; ) {
             unchecked {
@@ -198,9 +204,17 @@ contract BinaryPlan is Base, IBinaryPlan, Initializable {
         uint256 bonus = account.leftVolume < account.rightVolume
             ? account.leftVolume
             : account.rightVolume;
-        uint256 received = (bonus * bonusPercentage) / percentageFraction;
+        uint256 received = account.directBonus +
+            ((bonus * bonusPercentage) / percentageFraction);
 
-        return maxReceived > received ? received : maxReceived;
+        claimable = maxReceived > received ? received : maxReceived;
+
+        if (claimable > account.claimed) {
+            claimable -= account.claimed;
+            account.claimed += uint96(claimable);
+        } else claimable = 0;
+
+        accounts[account_] = account;
     }
 
     function numBalancedLevel(

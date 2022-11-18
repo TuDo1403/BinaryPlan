@@ -6,10 +6,11 @@ interface IBinaryPlan {
         address directReferrer;
         uint96 leftVolume;
         uint8 leftHeight;
+        uint96 directBonus;
         uint8 rightHeight;
-        uint16 directPercentage;
         uint96 rightVolume;
         uint96 maxVolume;
+        uint96 claimed;
     }
 
     struct Bonus {
@@ -31,5 +32,5 @@ interface IBinaryPlan {
 
     function updateVolume(address account, uint96 volume) external;
 
-    function withdrawableAmt(address account_) external view returns (uint256);
+    function withdrawableAmt(address account_) external returns (uint256);
 }
